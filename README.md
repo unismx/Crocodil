@@ -62,7 +62,7 @@ https://github.com/KazaiMazai/Crocodil.git
 ## Usage
 
 ### Registering Dependencies
-Declaration and registration happen in one shot, ensuring compile-time completeness:
+Declaration and registration happen in one shot. The variable name then acts as a keypath-based key ensuring compile-time completeness:
 
 ```swift
 extension Dependencies {
@@ -105,6 +105,69 @@ Swap out dependencies at runtime, perfect for unit tests:
 ```swift
 Dependencies.inject(\.networkClient, NetworkClientMock())
 ```
+
+### Mutating Dependencies
+
+ Crocodil allows to mutate dependencies atomically:
+ 
+```swift
+extension Dependencies {
+    @DependencyEntry var intValue: Int = 0
+}
+
+Dependencies.update(intValue: {
+    $0 += 1
+})
+ 
+```
+
+> [!NOTICE]
+> Due to Swift macro limitations, atomic mutation is availave only for dependencies injected with explicitly declared type. 
+
+```diff
+extension Dependencies {
+-   @DependencyEntry var intValue = 0
++   @DependencyEntry var intValue: Int = 0
+}
+```
+### Access Control Scopes
+
+Crocodil respects access control attributes allowing to naturally scope the dependencies instances.
+
+```swift
+// This will create and register 2 independent instances of register dependencies. 
+// Each will be accessed according to access control attributes. 
+//
+//FileA.swift: 
+fileprivate extension Dependencies {
+    // Scope-limited lifecycle
+    @DependencyEntry var localService: Service()
+} 
+ 
+//FileB.swift:
+fileprivate extension Dependencies {
+    @DependencyEntry var localService: Service()
+} 
+```
+
+### Lifecycle
+
+@DependencyEntry supports all kinds of types including closures and lazy instance initialization.
+This allows to design any kind of dependency lifecycle: 
+
+```swift
+ extension Dependencies {
+   // Plain singleton
+    @DependencyEntry var networkClient: ClientProtocol = NetworkClient()
+
+    // Lazily initialized singleton
+    @DependencyEntry var lazyService = { Service() }()
+
+    // Transient instance via closure
+    @DependencyEntry var now = { Date() }
+ } 
+```
+ 
 ## Examples
 
 ### Effortless Singletons Replacement
@@ -124,6 +187,8 @@ class NetworkClient {
 }
 ```
 
+
+
 ## Crocodil Injection vs. SwiftUI's EnvironmentValues
 
 | Feature           | SwiftUI EnvironmentValues   | Crocodil Injection              |
@@ -138,7 +203,8 @@ class NetworkClient {
 
 ## How Does It Work
 
-Crocodil provides a workaround to silence the Swift 6 concurrency warning by using `nonisolated(unsafe)` and syncronizes access to the variable via dedicated concurrent queue which makes access to the shared vaiable actually safe. Crocodil is designed in a way to make it impossible to access the variables directly in any unsafe way.
+Crocodil provides a workaround to silence the Swift 6 concurrency warning by using `nonisolated(unsafe)` and syncronizes access to the variable via dedicated concurrent queue which makes access to the shared vaiable actually safe. 
+Crocodil is designed in a way to make it impossible to access the variables directly in any unsafe way.
  
 
 > [!WARNING]
@@ -146,12 +212,14 @@ Crocodil provides a workaround to silence the Swift 6 concurrency warning by usi
 
 
 ## ⚠️ Limitations
+
 - **Circular Dependencies**: Crocodil cannot detect circular references. 
 - **Thread Safety**: While read/write access to the injected instances is synchronized, the injected instances are not automatically thread-safe.
 
 
 ## Alternatives
-There are many other dependency injection libraries in the Swift, but only one of them is Crocodil
+
+There are many dependency injection libraries in the Swift, but only one of them is Crocodil
 
 - [Factory](https://github.com/hmlongco/Factory)
 - [Needle](https://github.com/uber/needle)
